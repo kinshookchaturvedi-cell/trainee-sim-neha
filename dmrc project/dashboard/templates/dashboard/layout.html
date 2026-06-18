@@ -3,85 +3,277 @@
 <head>
     <title>DMRC Track Layout</title>
     <style>
-        body { font-family: Arial; background: #1a1a2e; color: white; padding: 20px; }
+        body { font-family: Arial; background: #0a0a1a; color: white; padding: 20px; margin: 0; }
         h2 { color: #e63946; }
         .actions { margin: 15px 0; }
-        .actions a { padding: 8px 18px; background: #003580; color: white;
-                     border-radius: 5px; text-decoration: none; margin-right: 10px; }
-        svg { background: #0d0d0d; border-radius: 10px; border: 1px solid #333; }
-        .legend { margin-top: 15px; font-size: 13px; color: #aaa; }
-        span.dot { display: inline-block; width: 12px; height: 12px;
-                   border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+        .actions a, .actions button {
+            padding: 8px 18px; background: #003580; color: white;
+            border: none; border-radius: 5px; text-decoration: none;
+            margin-right: 10px; cursor: pointer; font-size: 14px;
+        }
+        .legend { margin-top: 15px; font-size: 13px; color: #aaa; display: flex; gap: 24px; flex-wrap: wrap; }
+        .leg { display: flex; align-items: center; gap: 8px; }
+        .leg-line { width: 30px; height: 4px; border-radius: 2px; }
+        .leg-box  { width: 14px; height: 14px; border-radius: 2px; }
+        svg { display: block; margin-top: 20px; border-radius: 8px; }
     </style>
 </head>
 <body>
-<h2>🚇 DMRC Track Layout</h2>
-<p>Stations: <strong>{{ layout.num_stations }}</strong> &nbsp;|&nbsp;
-   Crossovers: <strong>{{ layout.num_crossovers }}</strong></p>
+
+<h2>DMRC Track Layout — Live Simulation</h2>
+<p>Stations: <strong>{{ layout.num_stations }}</strong>
+   &nbsp;|&nbsp; Crossovers: <strong>{{ layout.num_crossovers }}</strong>
+   &nbsp;|&nbsp; Train status: <span id="train-status">Running on UP line</span></p>
 
 <div class="actions">
     <a href="{% url 'input' %}">← New Layout</a>
     <a href="{% url 'export_csv' %}">⬇ Export CSV</a>
     <a href="{% url 'logout' %}">Logout</a>
+    <button onclick="toggleSim()">Pause / Resume</button>
 </div>
 
-<!-- THE TRACK SVG DRAWING -->
-<svg width="{{ svg_width }}" height="{{ svg_height }}" xmlns="http://www.w3.org/2000/svg">
+<svg id="track-svg" width="{{ svg_width }}" height="{{ svg_height }}"
+     xmlns="http://www.w3.org/2000/svg" style="background:#0d0d1a;">
 
-    <!-- UP LINE (green) -->
-    <line x1="{{ track_x1 }}" y1="{{ up_y }}"
-          x2="{{ track_x2 }}" y2="{{ up_y }}"
-          stroke="#00ff88" stroke-width="3"/>
-    <text x="5" y="{{ up_y|add:5 }}" fill="#00ff88" font-size="12">UP</text>
+    <text x="8" y="{{ up_y|add:-14 }}" fill="#00ff88" font-size="11" font-family="Arial" font-weight="bold">UP LINE</text>
+    <text x="8" y="{{ down_y|add:22 }}" fill="#ffd700" font-size="11" font-family="Arial" font-weight="bold">DOWN LINE</text>
 
-    <!-- DOWN LINE (yellow) -->
-    <line x1="{{ track_x1 }}" y1="{{ down_y }}"
-          x2="{{ track_x2 }}" y2="{{ down_y }}"
-          stroke="#ffd700" stroke-width="3"/>
-    <text x="5" y="{{ down_y|add:5 }}" fill="#ffd700" font-size="12">DN</text>
+    <!-- ── TRACK SEGMENTS (each segment can change color = occupancy) ── -->
+    <g id="up-track-segments"></g>
+    <g id="down-track-segments"></g>
 
-    <!-- STATIONS -->
-    {% for s in stations %}
-        <!-- Station box on UP line -->
-        <rect x="{{ s.box_x }}" y="{{ s.box_up_y }}"
-              width="{{ s.width }}" height="{{ s.height }}"
-              fill="#003580" stroke="#00ff88" stroke-width="1.5" rx="3"/>
-        <text x="{{ s.x }}" y="{{ s.up_y|add:5 }}"
-              text-anchor="middle" fill="white" font-size="10">{{ s.label }}</text>
-
-        <!-- Station box on DOWN line -->
-        <rect x="{{ s.box_x }}" y="{{ s.box_down_y }}"
-              width="{{ s.width }}" height="{{ s.height }}"
-              fill="#003580" stroke="#ffd700" stroke-width="1.5" rx="3"/>
-        <text x="{{ s.x }}" y="{{ s.down_y|add:5 }}"
-              text-anchor="middle" fill="white" font-size="10">{{ s.label }}</text>
+    <!-- ── DEPOTS ── -->
+    {% for dp in depots %}
+        <line x1="{{ dp.x1 }}" y1="{{ dp.y1 }}" x2="{{ dp.x2 }}" y2="{{ dp.y2 }}"
+              stroke="#ff8800" stroke-width="3"/>
+        <line x1="{{ dp.x2 }}" y1="{{ dp.y2 }}" x2="{{ dp.x2|add:65 }}" y2="{{ dp.y2 }}"
+              stroke="#ff8800" stroke-width="3"/>
+        <circle cx="{{ dp.x1 }}" cy="{{ dp.y1 }}" r="5" fill="#ff8800"/>
+        <rect x="{{ dp.x2|add:2 }}" y="{{ dp.y2|add:-16 }}" width="66" height="16"
+              fill="#1a0d00" stroke="#ff8800" stroke-width="1.5" rx="3"/>
+        <text x="{{ dp.x2|add:35 }}" y="{{ dp.y2|add:-5 }}" text-anchor="middle"
+              fill="#ff8800" font-size="9" font-family="Arial" font-weight="bold">DEPOT ST{{ dp.near_station }}</text>
     {% endfor %}
 
-    <!-- CROSSOVERS (diagonal lines between UP and DOWN) -->
+    <!-- ── CROSSOVERS (fixed distance from station) ── -->
     {% for co in crossovers %}
-        <!-- Line from UP track at from_station → DOWN track at to_station -->
-        <line x1="{{ co.x1 }}" y1="{{ co.up_y }}"
-              x2="{{ co.x2 }}" y2="{{ co.down_y }}"
-              stroke="#ff4444" stroke-width="2.5" stroke-dasharray="6,3"/>
-        <!-- Diamond marker at midpoint -->
-        <polygon points="{{ co.mid_x }},{{ co.up_y|add:30 }}
-                         {{ co.mid_x|add:8 }},{{ co.up_y|add:50 }}
-                         {{ co.mid_x }},{{ co.up_y|add:70 }}
-                         {{ co.mid_x|add:-8 }},{{ co.up_y|add:50 }}"
-                 fill="#ff4444" opacity="0.8"/>
-        <text x="{{ co.mid_x }}" y="{{ co.up_y|add:100 }}"
-              text-anchor="middle" fill="#ff4444" font-size="10">
-            X: ST{{ co.from_station }}↔ST{{ co.to_station }}
-        </text>
+        <rect x="{{ co.x_left }}" y="{{ up_y|add:-3 }}" width="{{ co.x_right|add:0 }}" height="6" fill="#0d0d1a"/>
+        <rect x="{{ co.x_left }}" y="{{ down_y|add:-3 }}" width="{{ co.x_right|add:0 }}" height="6" fill="#0d0d1a"/>
+        <line x1="{{ co.d1_x1 }}" y1="{{ co.d1_y1 }}" x2="{{ co.d1_x2 }}" y2="{{ co.d1_y2 }}" stroke="#ff3333" stroke-width="3"/>
+        <line x1="{{ co.d2_x1 }}" y1="{{ co.d2_y1 }}" x2="{{ co.d2_x2 }}" y2="{{ co.d2_y2 }}" stroke="#ff3333" stroke-width="3"/>
+        <circle cx="{{ co.up_left }}" cy="{{ up_y }}" r="4" fill="#ff3333"/>
+        <circle cx="{{ co.up_right }}" cy="{{ up_y }}" r="4" fill="#ff3333"/>
+        <circle cx="{{ co.dn_left }}" cy="{{ down_y }}" r="4" fill="#ff3333"/>
+        <circle cx="{{ co.dn_right }}" cy="{{ down_y }}" r="4" fill="#ff3333"/>
+        <rect x="{{ co.mid_x|add:-20 }}" y="{{ co.mid_y|add:-10 }}" width="40" height="18"
+              fill="#1a0000" stroke="#ff3333" stroke-width="1" rx="3"/>
+        <text x="{{ co.mid_x }}" y="{{ co.mid_y|add:4 }}" text-anchor="middle"
+              fill="#ff4444" font-size="9" font-family="Arial" font-weight="bold">XOV</text>
     {% endfor %}
+
+    <!-- ── STATIONS ── -->
+    {% for s in stations %}
+        <text x="{{ s.x }}" y="{{ s.box_up_y|add:-8 }}" text-anchor="middle"
+              fill="#88ccff" font-size="10" font-family="Arial" font-weight="bold">{{ s.label }}</text>
+
+        <rect x="{{ s.box_x }}" y="{{ s.box_up_y }}" width="{{ s.width }}" height="{{ s.height }}"
+              fill="#003580" stroke="#00ff88" stroke-width="2" rx="3"/>
+        <text x="{{ s.x }}" y="{{ s.up_y|add:5 }}" text-anchor="middle" dominant-baseline="middle"
+              fill="white" font-size="9" font-family="Arial" font-weight="bold">PF-01</text>
+
+        <rect x="{{ s.box_x }}" y="{{ s.box_down_y }}" width="{{ s.width }}" height="{{ s.height }}"
+              fill="#003580" stroke="#ffd700" stroke-width="2" rx="3"/>
+        <text x="{{ s.x }}" y="{{ s.down_y|add:5 }}" text-anchor="middle" dominant-baseline="middle"
+              fill="white" font-size="9" font-family="Arial" font-weight="bold">PF-02</text>
+
+        <line x1="{{ s.x }}" y1="{{ s.box_up_y|add:24 }}" x2="{{ s.x }}" y2="{{ s.box_down_y }}"
+              stroke="#4488ff" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <!-- PLATFORM OCCUPANCY LIGHT (red = train present, green = clear) -->
+        <circle id="signal-up-{{ s.number }}" cx="{{ s.box_x|add:-10 }}" cy="{{ s.up_y }}" r="5" fill="#00ff00"/>
+        <circle id="signal-down-{{ s.number }}" cx="{{ s.box_x|add:70 }}" cy="{{ s.down_y }}" r="5" fill="#00ff00"/>
+    {% endfor %}
+
+    <!-- ── THE TRAIN ITSELF ── -->
+    <rect id="train" x="0" y="0" width="34" height="14" rx="3"
+          fill="#ffdd00" stroke="#000" stroke-width="1"/>
+    <text id="train-label" x="0" y="0" text-anchor="middle" dominant-baseline="middle"
+          font-size="8" font-family="Arial" font-weight="bold" fill="#000">TRAIN</text>
 
 </svg>
 
 <div class="legend">
-    <span class="dot" style="background:#00ff88"></span> UP Line &nbsp;
-    <span class="dot" style="background:#ffd700"></span> DOWN Line &nbsp;
-    <span class="dot" style="background:#003580"></span> Station &nbsp;
-    <span class="dot" style="background:#ff4444"></span> Crossover
+    <div class="leg"><div class="leg-line" style="background:#00ff88"></div> UP Line</div>
+    <div class="leg"><div class="leg-line" style="background:#ffd700"></div> DOWN Line</div>
+    <div class="leg"><div class="leg-box" style="background:#003580; border:2px solid #00ff88"></div> Platform</div>
+    <div class="leg"><div class="leg-line" style="background:#ff3333"></div> Crossover (XOV)</div>
+    <div class="leg"><div class="leg-line" style="background:#ff8800"></div> Depot</div>
+    <div class="leg"><div class="leg-box" style="background:#00ff00; border-radius:50%; width:10px; height:10px"></div> Platform / Track clear</div>
+    <div class="leg"><div class="leg-box" style="background:#ff0000; border-radius:50%; width:10px; height:10px"></div> Train occupying</div>
 </div>
-</body>
-</html>
+
+<script>
+// ── Data passed from Django ────────────────────────────────────
+const stations = {{ stations_json|safe }};
+const upY   = {{ up_y }};
+const downY = {{ down_y }};
+const trackX1 = {{ track_x1 }};
+const trackX2 = {{ track_x2 }};
+const crossovers = {{ crossovers_json|safe }};
+
+const trainEl = document.getElementById('train');
+const trainLabel = document.getElementById('train-label');
+
+const lastCrossover = crossovers.length > 0 ? crossovers[crossovers.length - 1] : null;
+const firstCrossover = crossovers.length > 0 ? crossovers[0] : null;
+
+// ── Build the full path the train follows as a list of straight segments ──
+function buildPath() {
+    const path = [];
+
+    if (lastCrossover) {
+        path.push({x1: trackX1, y1: upY, x2: lastCrossover.up_left, y2: upY, track: 'up'});
+        path.push({x1: lastCrossover.up_left, y1: upY, x2: lastCrossover.dn_right, y2: downY, track: 'crossover'});
+        path.push({x1: lastCrossover.dn_right, y1: downY, x2: trackX2, y2: downY, track: 'down'});
+    } else {
+        path.push({x1: trackX1, y1: upY, x2: trackX2, y2: upY, track: 'up'});
+    }
+
+    if (firstCrossover) {
+        path.push({x1: trackX2, y1: downY, x2: firstCrossover.dn_right, y2: downY, track: 'down'});
+        path.push({x1: firstCrossover.dn_right, y1: downY, x2: firstCrossover.up_left, y2: upY, track: 'crossover'});
+        path.push({x1: firstCrossover.up_left, y1: upY, x2: trackX1, y2: upY, track: 'up'});
+    } else {
+        path.push({x1: trackX2, y1: downY, x2: trackX1, y2: downY, track: 'down'});
+    }
+
+    return path;
+}
+
+const journey = buildPath();
+let segIndex = 0;
+let segProgress = 0;
+const SPEED = 0.006;
+let running = true;
+
+// ── Draw track segments as individually colorable lines ──────────
+function drawTrackSegments() {
+    const upGroup = document.getElementById('up-track-segments');
+    const downGroup = document.getElementById('down-track-segments');
+    upGroup.innerHTML = '';
+    downGroup.innerHTML = '';
+
+    const sorted = [...stations].sort((a, b) => a.x - b.x);
+    for (let i = 0; i < sorted.length - 1; i++) {
+        const x1 = sorted[i].x + sorted[i].width / 2;
+        const x2 = sorted[i + 1].x - sorted[i + 1].width / 2;
+
+        const upLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        upLine.setAttribute('x1', x1); upLine.setAttribute('y1', upY);
+        upLine.setAttribute('x2', x2); upLine.setAttribute('y2', upY);
+        upLine.setAttribute('stroke', '#00ff88'); upLine.setAttribute('stroke-width', '4');
+        upLine.setAttribute('id', 'block-up-' + i);
+        upGroup.appendChild(upLine);
+
+        const downLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        downLine.setAttribute('x1', x1); downLine.setAttribute('y1', downY);
+        downLine.setAttribute('x2', x2); downLine.setAttribute('y2', downY);
+        downLine.setAttribute('stroke', '#ffd700'); downLine.setAttribute('stroke-width', '4');
+        downLine.setAttribute('id', 'block-down-' + i);
+        downGroup.appendChild(downLine);
+    }
+
+    const leadUp = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    leadUp.setAttribute('x1', trackX1); leadUp.setAttribute('y1', upY);
+    leadUp.setAttribute('x2', sorted[0].x - sorted[0].width / 2); leadUp.setAttribute('y2', upY);
+    leadUp.setAttribute('stroke', '#00ff88'); leadUp.setAttribute('stroke-width', '4');
+    leadUp.setAttribute('id', 'block-up-lead');
+    upGroup.appendChild(leadUp);
+
+    const trailDown = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const lastS = sorted[sorted.length - 1];
+    trailDown.setAttribute('x1', lastS.x + lastS.width / 2); trailDown.setAttribute('y1', downY);
+    trailDown.setAttribute('x2', trackX2); trailDown.setAttribute('y2', downY);
+    trailDown.setAttribute('stroke', '#ffd700'); trailDown.setAttribute('stroke-width', '4');
+    trailDown.setAttribute('id', 'block-down-trail');
+    downGroup.appendChild(trailDown);
+}
+
+function resetAllBlocksAndSignals() {
+    document.querySelectorAll('[id^="block-up-"]').forEach(el => el.setAttribute('stroke', '#00ff88'));
+    document.querySelectorAll('[id^="block-down-"]').forEach(el => el.setAttribute('stroke', '#ffd700'));
+    stations.forEach(s => {
+        const up = document.getElementById('signal-up-' + s.number);
+        const down = document.getElementById('signal-down-' + s.number);
+        if (up) up.setAttribute('fill', '#00ff00');
+        if (down) down.setAttribute('fill', '#00ff00');
+    });
+}
+
+function updateOccupancy(x, y, track) {
+    resetAllBlocksAndSignals();
+    if (track === 'crossover') return;
+
+    const sorted = [...stations].sort((a, b) => a.x - b.x);
+    const prefix = track === 'up' ? 'block-up-' : 'block-down-';
+    const color = '#ff0000';
+
+    if (track === 'up' && x < sorted[0].x) {
+        const el = document.getElementById('block-up-lead');
+        if (el) el.setAttribute('stroke', color);
+    }
+    if (track === 'down' && x > sorted[sorted.length - 1].x) {
+        const el = document.getElementById('block-down-trail');
+        if (el) el.setAttribute('stroke', color);
+    }
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+        if (x >= sorted[i].x && x <= sorted[i + 1].x) {
+            const el = document.getElementById(prefix + i);
+            if (el) el.setAttribute('stroke', color);
+        }
+    }
+
+    stations.forEach(s => {
+        if (Math.abs(s.x - x) < 30) {
+            const sigId = track === 'up' ? 'signal-up-' + s.number : 'signal-down-' + s.number;
+            const el = document.getElementById(sigId);
+            if (el) el.setAttribute('fill', '#ff0000');
+        }
+    });
+}
+
+function moveTrain() {
+    if (!running) return;
+
+    segProgress += SPEED;
+    if (segProgress >= 1) {
+        segProgress = 0;
+        segIndex = (segIndex + 1) % journey.length;
+
+        const seg = journey[segIndex];
+        if (seg.track === 'up') {
+            document.getElementById('train-status').innerText = 'Running on UP line';
+        } else if (seg.track === 'down') {
+            document.getElementById('train-status').innerText = 'Running on DOWN line';
+        } else {
+            document.getElementById('train-status').innerText = 'Crossing over...';
+        }
+    }
+
+    const seg = journey[segIndex];
+    const x = seg.x1 + (seg.x2 - seg.x1) * segProgress;
+    const y = seg.y1 + (seg.y2 - seg.y1) * segProgress;
+
+    trainEl.setAttribute('x', x - 17);
+    trainEl.setAttribute('y', y - 7);
+    trainLabel.setAttribute('x', x);
+    trainLabel.setAttribute('y', y);
+    trainEl.setAttribute('fill', seg.track === 'down' ? '#ffd700' : (seg.track === 'crossover' ? '#ff66ff' : '#00ff88'));
+
+    updateOccupancy(x, y, seg.track);
+}
+
+function toggleSim() {
+    running = !running;
+}
