@@ -43,7 +43,7 @@ class PointSwitch:
         self.x_right = x_right            # Right geometric coordinate
         self.y_up = y_up                  # Y coordinate on UP line
         self.y_down = y_down              # Y coordinate on DOWN line
-        self.current_state = 'N'          # State: 'N' (Normal / Straight) or 'R' (Reverse / Diverging)
+        self.current_state = 'NORMAL'     # State: 'NORMAL' (Normal / Straight) or 'REVERSE' (Reverse / Diverging)
         self.is_locked = False            # True when a train occupies self.tc_id (cannot switch)
     def to_dict(self):
         return {
@@ -493,6 +493,12 @@ class Train:
         self.y = journey[0]['y1']
         self.last_stopped_station = None
         self.last_stopped_line = None
+        
+        # New telemetry parameters (m, d, s, t mappings)
+        self.current_tc = 'TC-UNKNOWN'
+        self.chainage = 0.0
+        self.direction = 'UP'
+        self.mode = 'ATO'
     def get_speed_kmh(self):
         return self.speed * 3.6
     def calculate_acceleration(self):
@@ -515,7 +521,18 @@ class Train:
             'x': self.x,
             'y': self.y,
             'last_stopped_station': self.last_stopped_station,
-            'last_stopped_line': self.last_stopped_line
+            'last_stopped_line': self.last_stopped_line,
+            
+            # Signaling parameters (m, d, s, t)
+            'current_tc': self.current_tc,
+            'current_track_circuit': self.current_tc,
+            'chainage': self.chainage,
+            'mode': self.mode,
+            'm': self.mode,
+            'direction': self.direction,
+            'd': self.direction,
+            's': self.get_speed_kmh(),
+            't': self.current_tc
         }
     @classmethod
     def from_dict(cls, data, journey):
@@ -530,6 +547,12 @@ class Train:
         t.y = data['y']
         t.last_stopped_station = data['last_stopped_station']
         t.last_stopped_line = data['last_stopped_line']
+        
+        # Load new fields with fallback
+        t.current_tc = data.get('current_tc', 'TC-UNKNOWN')
+        t.chainage = data.get('chainage', 0.0)
+        t.direction = data.get('direction', 'UP')
+        t.mode = data.get('mode', 'ATO')
         return t
 class TrainSimEngine:
     """
@@ -542,12 +565,23 @@ class TrainSimEngine:
         self.signals = [SignalPost(s['signal_id'], s['line'], s['x'], s['y'], s['protects_tc_id'], s['signal_type']) for s in network_data['signals']]
         self.journey = journey
         self.train = Train('TR-0011', journey)
+        self.event_logs = []
+    def log_event(self, message, type='INFO'):
+        import datetime
+        timestamp = datetime.datetime.now().strftime('%H:%M:%S')
+        self.event_logs.append({
+            'timestamp': timestamp,
+            'message': message,
+            'type': type
+        })
+        self.event_logs = self.event_logs[-50:]
     def to_dict(self):
         return {
             'train': self.train.to_dict(),
             'track_circuits': [tc.to_dict() for tc in self.track_circuits],
             'points': [p.to_dict() for p in self.points],
-            'signals': [s.to_dict() for s in self.signals]
+            'signals': [s.to_dict() for s in self.signals],
+            'event_logs': self.event_logs
         }
     @classmethod
     def from_dict(cls, data, network_data, journey):
@@ -560,9 +594,13 @@ class TrainSimEngine:
             p.is_locked = p_data['is_locked']
         for s_data, s in zip(data['signals'], engine.signals):
             s.aspect = s_data['aspect']
+        engine.event_logs = data.get('event_logs', [])
         return engine
     def tick(self, dt):
         t = self.train
+        prev_state = t.state
+        prev_seg_index = t.seg_index
+        prev_tc = t.current_tc
         current_seg = self.journey[t.seg_index]
         speed_limit = (25.0 / 3.6) if current_seg['track'] == 'crossover' else (60.0 / 3.6)
         if t.state == 'DWELLING':
@@ -571,6 +609,7 @@ class TrainSimEngine:
             t.dwell_timer -= dt
             if t.dwell_timer <= 0.0:
                 t.state = 'ACCELERATING'
+                self.log_event(f"Train {t.train_id} completed dwelling and is departing")
             return
         # 1. Locate next station target stop on the current segment
         stop_target_dist = None
@@ -611,6 +650,7 @@ class TrainSimEngine:
                 t.last_stopped_station = target_station_obj['number']
                 t.last_stopped_line = current_seg['track']
                 
+                self.log_event(f"Train {t.train_id} arrived at {target_station_obj['label']} (" + ("PF-01" if current_seg['track'] == 'up' else "PF-02") + ") and is dwelling")
                 self.evaluate_interlocking(target_station_obj['x'], current_seg['track'])
                 return
         else:
@@ -652,8 +692,20 @@ class TrainSimEngine:
         progress_ratio = (t.seg_progress / next_seg_active['length']) if next_seg_active['length'] > 0 else 1.0
         t.x = next_seg_active['x1'] + (next_seg_active['x2'] - next_seg_active['x1']) * progress_ratio
         t.y = next_seg_active['y1'] + (next_seg_active['y2'] - next_seg_active['y1']) * progress_ratio
+        
+        # Update train telemetry parameters (m, d, s, t mappings)
+        t.mode = 'ATO'
+        t.direction = next_seg_active['track'].upper()
+        t.chainage = round(t.x - 100.0, 1)  # 1 pixel = 1 meter, starting at X=100 (Station 1)
+        
         # 5. Run interlocking
         self.evaluate_interlocking(t.x, next_seg_active['track'])
+        
+        # Log key state transitions and block entries
+        if t.state != prev_state:
+            self.log_event(f"Train {t.train_id} state changed to {t.state}")
+        if t.current_tc != prev_tc and t.current_tc != 'TC-UNKNOWN':
+            self.log_event(f"Train {t.train_id} entered track circuit {t.current_tc}")
     def evaluate_interlocking(self, train_x, train_line):
         # Reset occupancy
         for tc in self.track_circuits:
@@ -667,13 +719,23 @@ class TrainSimEngine:
                 if min_x <= train_x <= max_x:
                     tc.is_occupied = True
                     active_tc = tc
+        
+        if active_tc:
+            self.train.current_tc = active_tc.tc_id
+        else:
+            self.train.current_tc = 'TC-UNKNOWN'
         # Lock point switches (Track Locking)
         for pt in self.points:
+            prev_locked = pt.is_locked
             if pt.tc_id == (active_tc.tc_id if active_tc else None):
                 pt.is_locked = True
             else:
                 pt.is_locked = False
+            if pt.is_locked != prev_locked:
+                status = "LOCKED" if pt.is_locked else "UNLOCKED"
+                self.log_event(f"Point Switch {pt.point_id} ({pt.tc_id}) is {status}", type="WARNING" if pt.is_locked else "INFO")
         # Cascade Signal Aspects
+        prev_aspects = {sig.signal_id: sig.aspect for sig in self.signals}
         for sig in self.signals:
             sig.aspect = 'GREEN'
         if train_line == 'up':
@@ -719,6 +781,11 @@ class TrainSimEngine:
                             line_sigs[idx - 1].aspect = 'VIOLET'
                     except ValueError:
                         pass
+        # Log signal changes
+        for sig in self.signals:
+            old = prev_aspects.get(sig.signal_id)
+            if old and sig.aspect != old:
+                self.log_event(f"Signal {sig.signal_id} aspect changed to {sig.aspect}")
 @login_required(login_url='login')
 def simulation_tick(request):
     """
@@ -780,6 +847,34 @@ def simulation_tick(request):
     # Execute simulation tick
     engine.tick(dt)
     # Save state back to session
-    request.session['sim_state'] = engine.to_dict()
+    engine_dict = engine.to_dict()
+    request.session['sim_state'] = engine_dict
+    
+    # Enrich response data with stations, crossovers, and event logs
+    response_data = dict(engine_dict)
+    response_data['stations'] = network_data['stations']
+    
+    crossovers_payload = []
+    for pt in engine.points:
+        mid_x = (pt.x_left + pt.x_right) // 2
+        mid_y = (pt.y_up + pt.y_down) // 2
+        crossovers_payload.append({
+            'index':        int(pt.point_id.split('-')[1]),
+            'point_id':     pt.point_id,
+            'tc_id':        pt.tc_id,
+            'from_station': pt.from_station,
+            'to_station':   pt.to_station,
+            'position':     pt.position_type,
+            'type':         'up_to_down' if (pt.from_station < pt.to_station or pt.from_station == num_stations) else 'down_to_up',
+            'x_left':       pt.x_left,
+            'x_right':      pt.x_right,
+            'width':        pt.x_right - pt.x_left,
+            'mid_x':        mid_x,
+            'mid_y':        mid_y,
+            'current_state': pt.current_state,
+            'is_locked':    pt.is_locked
+        })
+    response_data['crossovers'] = crossovers_payload
+    
     from django.http import JsonResponse
-    return JsonResponse(engine.to_dict())
+    return JsonResponse(response_data)
