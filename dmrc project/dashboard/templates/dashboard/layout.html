@@ -1,279 +1,598 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DMRC Track Layout</title>
+    <title>DMRC Operations Control Centre — Live Simulation</title>
+    <!-- Import Outfit Google Font for a modern premium look -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial; background: #0a0a1a; color: white; padding: 20px; margin: 0; }
-        h2 { color: #e63946; }
-        .actions { margin: 15px 0; }
-        .actions a, .actions button {
-            padding: 8px 18px; background: #003580; color: white;
-            border: none; border-radius: 5px; text-decoration: none;
-            margin-right: 10px; cursor: pointer; font-size: 14px;
+        :root {
+            --bg-color: #05050f;
+            --card-bg: rgba(13, 13, 29, 0.7);
+            --border-color: rgba(68, 136, 255, 0.2);
+            --accent-red: #ff3344;
+            --accent-green: #00ff88;
+            --accent-yellow: #ffd700;
+            --accent-violet: #df40ff;
+            --text-main: #f0f2fa;
+            --text-muted: #8a90a6;
         }
-        .legend { margin-top: 15px; font-size: 13px; color: #aaa; display: flex; gap: 24px; flex-wrap: wrap; }
-        .leg { display: flex; align-items: center; gap: 8px; }
-        .leg-line { width: 30px; height: 4px; border-radius: 2px; }
-        .leg-box  { width: 14px; height: 14px; border-radius: 2px; }
-        svg { display: block; margin-top: 20px; border-radius: 8px; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-color);
+            color: var(--text-main);
+            padding: 24px;
+            margin: 0;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(20, 20, 50, 0.3) 0px, transparent 50%),
+                radial-gradient(at 50% 0%, rgba(0, 53, 128, 0.15) 0px, transparent 50%);
+            min-height: 100vh;
+        }
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+        h2 {
+            font-size: 26px;
+            font-weight: 800;
+            margin: 0;
+            background: linear-gradient(135deg, #fff 30%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 24px;
+            background: var(--accent-red);
+            border-radius: 4px;
+        }
+        .status-badge {
+            font-family: 'Share Tech Mono', monospace;
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+        }
+        .actions a, .actions button {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            padding: 8px 20px;
+            background: rgba(68, 136, 255, 0.1);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .actions a:hover, .actions button:hover {
+            background: rgba(68, 136, 255, 0.25);
+            border-color: rgba(68, 136, 255, 0.5);
+            transform: translateY(-1px);
+        }
+        .actions .btn-primary {
+            background: #003580;
+            border-color: #0055d0;
+        }
+        .actions .btn-primary:hover {
+            background: #004dc0;
+            border-color: #0077ff;
+        }
+        /* HUD Dashboard Panel */
+        .hud-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .hud-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .hud-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--border-color), transparent);
+        }
+        .hud-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .hud-value {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--text-main);
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+        .hud-unit {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-family: 'Outfit', sans-serif;
+            font-weight: 300;
+        }
+        .text-green { color: var(--accent-green); }
+        .text-yellow { color: var(--accent-yellow); }
+        .text-red { color: var(--accent-red); }
+        .text-violet { color: var(--accent-violet); }
+        /* SVG Simulator Wrapper */
+        .canvas-container {
+            background: #070714;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.4);
+            margin-bottom: 24px;
+        }
+        svg {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        .legend {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px 24px;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .leg-title {
+            font-weight: 600;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .leg {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .leg-line {
+            width: 30px;
+            height: 4px;
+            border-radius: 2px;
+            box-shadow: 0 0 8px currentColor;
+        }
+        .leg-box {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+        .leg-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            box-shadow: 0 0 6px currentColor;
+        }
     </style>
 </head>
 <body>
-
-<h2>DMRC Track Layout — Live Simulation</h2>
-<p>Stations: <strong>{{ layout.num_stations }}</strong>
-   &nbsp;|&nbsp; Crossovers: <strong>{{ layout.num_crossovers }}</strong>
-   &nbsp;|&nbsp; Train status: <span id="train-status">Running on UP line</span></p>
-
-<div class="actions">
-    <a href="{% url 'input' %}">← New Layout</a>
-    <a href="{% url 'export_csv' %}">⬇ Export CSV</a>
-    <a href="{% url 'logout' %}">Logout</a>
-    <button onclick="toggleSim()">Pause / Resume</button>
+<div class="header-container">
+    <h2>DMRC Track Operations Centre</h2>
+    <div class="actions">
+        <span class="status-badge" id="op-status">SYSTEM ACTIVE / AUTO RUN</span>
+        <a href="{% url 'input' %}">← Configure Layout</a>
+        <a href="{% url 'export_csv' %}">⬇ Export CSV</a>
+        <a href="{% url 'logout' %}">Logout</a>
+        <button onclick="toggleSim()" class="btn-primary" id="btn-pause">Pause Operations</button>
+    </div>
 </div>
-
-<svg id="track-svg" width="{{ svg_width }}" height="{{ svg_height }}"
-     xmlns="http://www.w3.org/2000/svg" style="background:#0d0d1a;">
-
-    <text x="8" y="{{ up_y|add:-14 }}" fill="#00ff88" font-size="11" font-family="Arial" font-weight="bold">UP LINE</text>
-    <text x="8" y="{{ down_y|add:22 }}" fill="#ffd700" font-size="11" font-family="Arial" font-weight="bold">DOWN LINE</text>
-
-    <!-- ── TRACK SEGMENTS (each segment can change color = occupancy) ── -->
-    <g id="up-track-segments"></g>
-    <g id="down-track-segments"></g>
-
-    <!-- ── DEPOTS ── -->
-    {% for dp in depots %}
-        <line x1="{{ dp.x1 }}" y1="{{ dp.y1 }}" x2="{{ dp.x2 }}" y2="{{ dp.y2 }}"
-              stroke="#ff8800" stroke-width="3"/>
-        <line x1="{{ dp.x2 }}" y1="{{ dp.y2 }}" x2="{{ dp.x2|add:65 }}" y2="{{ dp.y2 }}"
-              stroke="#ff8800" stroke-width="3"/>
-        <circle cx="{{ dp.x1 }}" cy="{{ dp.y1 }}" r="5" fill="#ff8800"/>
-        <rect x="{{ dp.x2|add:2 }}" y="{{ dp.y2|add:-16 }}" width="66" height="16"
-              fill="#1a0d00" stroke="#ff8800" stroke-width="1.5" rx="3"/>
-        <text x="{{ dp.x2|add:35 }}" y="{{ dp.y2|add:-5 }}" text-anchor="middle"
-              fill="#ff8800" font-size="9" font-family="Arial" font-weight="bold">DEPOT ST{{ dp.near_station }}</text>
-    {% endfor %}
-
-    <!-- ── CROSSOVERS (fixed distance from station) ── -->
-    {% for co in crossovers %}
-        <rect x="{{ co.x_left }}" y="{{ up_y|add:-3 }}" width="{{ co.x_right|add:0 }}" height="6" fill="#0d0d1a"/>
-        <rect x="{{ co.x_left }}" y="{{ down_y|add:-3 }}" width="{{ co.x_right|add:0 }}" height="6" fill="#0d0d1a"/>
-        <line x1="{{ co.d1_x1 }}" y1="{{ co.d1_y1 }}" x2="{{ co.d1_x2 }}" y2="{{ co.d1_y2 }}" stroke="#ff3333" stroke-width="3"/>
-        <line x1="{{ co.d2_x1 }}" y1="{{ co.d2_y1 }}" x2="{{ co.d2_x2 }}" y2="{{ co.d2_y2 }}" stroke="#ff3333" stroke-width="3"/>
-        <circle cx="{{ co.up_left }}" cy="{{ up_y }}" r="4" fill="#ff3333"/>
-        <circle cx="{{ co.up_right }}" cy="{{ up_y }}" r="4" fill="#ff3333"/>
-        <circle cx="{{ co.dn_left }}" cy="{{ down_y }}" r="4" fill="#ff3333"/>
-        <circle cx="{{ co.dn_right }}" cy="{{ down_y }}" r="4" fill="#ff3333"/>
-        <rect x="{{ co.mid_x|add:-20 }}" y="{{ co.mid_y|add:-10 }}" width="40" height="18"
-              fill="#1a0000" stroke="#ff3333" stroke-width="1" rx="3"/>
-        <text x="{{ co.mid_x }}" y="{{ co.mid_y|add:4 }}" text-anchor="middle"
-              fill="#ff4444" font-size="9" font-family="Arial" font-weight="bold">XOV</text>
-    {% endfor %}
-
-    <!-- ── STATIONS ── -->
-    {% for s in stations %}
-        <text x="{{ s.x }}" y="{{ s.box_up_y|add:-8 }}" text-anchor="middle"
-              fill="#88ccff" font-size="10" font-family="Arial" font-weight="bold">{{ s.label }}</text>
-
-        <rect x="{{ s.box_x }}" y="{{ s.box_up_y }}" width="{{ s.width }}" height="{{ s.height }}"
-              fill="#003580" stroke="#00ff88" stroke-width="2" rx="3"/>
-        <text x="{{ s.x }}" y="{{ s.up_y|add:5 }}" text-anchor="middle" dominant-baseline="middle"
-              fill="white" font-size="9" font-family="Arial" font-weight="bold">PF-01</text>
-
-        <rect x="{{ s.box_x }}" y="{{ s.box_down_y }}" width="{{ s.width }}" height="{{ s.height }}"
-              fill="#003580" stroke="#ffd700" stroke-width="2" rx="3"/>
-        <text x="{{ s.x }}" y="{{ s.down_y|add:5 }}" text-anchor="middle" dominant-baseline="middle"
-              fill="white" font-size="9" font-family="Arial" font-weight="bold">PF-02</text>
-
-        <line x1="{{ s.x }}" y1="{{ s.box_up_y|add:24 }}" x2="{{ s.x }}" y2="{{ s.box_down_y }}"
-              stroke="#4488ff" stroke-width="1" stroke-dasharray="4,3"/>
-
-        <!-- PLATFORM OCCUPANCY LIGHT (red = train present, green = clear) -->
-        <circle id="signal-up-{{ s.number }}" cx="{{ s.box_x|add:-10 }}" cy="{{ s.up_y }}" r="5" fill="#00ff00"/>
-        <circle id="signal-down-{{ s.number }}" cx="{{ s.box_x|add:70 }}" cy="{{ s.down_y }}" r="5" fill="#00ff00"/>
-    {% endfor %}
-
-    <!-- ── THE TRAIN ITSELF ── -->
-    <rect id="train" x="0" y="0" width="34" height="14" rx="3"
-          fill="#ffdd00" stroke="#000" stroke-width="1"/>
-    <text id="train-label" x="0" y="0" text-anchor="middle" dominant-baseline="middle"
-          font-size="8" font-family="Arial" font-weight="bold" fill="#000">TRAIN</text>
-
-</svg>
-
+<!-- Telemetry HUD Dashboard -->
+<div class="hud-panel">
+    <div class="hud-card">
+        <div class="hud-label">Train Speed</div>
+        <div class="hud-value"><span id="hud-speed">0.0</span><span class="hud-unit">km/h</span></div>
+    </div>
+    <div class="hud-card">
+        <div class="hud-label">Acceleration</div>
+        <div class="hud-value"><span id="hud-acc" class="text-green">+0.00</span><span class="hud-unit">m/s²</span></div>
+    </div>
+    <div class="hud-card">
+        <div class="hud-label">Active Block</div>
+        <div class="hud-value" id="hud-block" style="font-size: 20px;">UP LINE</div>
+    </div>
+    <div class="hud-card">
+        <div class="hud-label">Station Dwell</div>
+        <div class="hud-value"><span id="hud-dwell">-</span><span class="hud-unit">sec</span></div>
+    </div>
+    <div class="hud-card">
+        <div class="hud-label">Signal Ahead</div>
+        <div class="hud-value" id="hud-signal" style="font-size: 22px; font-weight: 600;">GREEN</div>
+    </div>
+</div>
+<div class="canvas-container">
+    <svg id="track-svg" viewBox="0 0 {{ svg_width }} {{ svg_height }}" width="100%" height="400"
+         xmlns="http://www.w3.org/2000/svg">
+        
+        <!-- Glow Filter for active lights and tracks -->
+        <defs>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+        </defs>
+        <text x="15" y="{{ up_y|add:-22 }}" fill="#00ff88" font-size="12" font-family="'Share Tech Mono', monospace" font-weight="bold" letter-spacing="1">▲ UP LINE (WEST TO EAST)</text>
+        <text x="15" y="{{ down_y|add:32 }}" fill="#ffd700" font-size="12" font-family="'Share Tech Mono', monospace" font-weight="bold" letter-spacing="1">▼ DOWN LINE (EAST TO WEST)</text>
+        <!-- ── TRACK SEGMENTS (Dynamic blocks) ── -->
+        <g id="up-track-segments"></g>
+        <g id="down-track-segments"></g>
+        <!-- ── DEPOTS ── -->
+        {% for dp in depots %}
+            <g id="depot-{{ forloop.counter }}">
+                <!-- Connecting turnout curve -->
+                <path d="M {{ dp.x1 }} {{ dp.y1 }} Q {{ dp.x1|add:10 }} {{ dp.y2 }} {{ dp.x2 }} {{ dp.y2 }}" 
+                      fill="none" stroke="#ff8800" stroke-width="2.5" stroke-dasharray="4,2"/>
+                <!-- Depot parking siding -->
+                <line x1="{{ dp.x2 }}" y1="{{ dp.y2 }}" x2="{{ dp.x2|add:65 }}" y2="{{ dp.y2 }}"
+                      stroke="#ff8800" stroke-width="3.5" filter="url(#glow)"/>
+                <!-- Indicator dot -->
+                <circle cx="{{ dp.x1 }}" cy="{{ dp.y1 }}" r="4" fill="#ff8800"/>
+                <!-- Depot shed box -->
+                <rect x="{{ dp.x2|add:2 }}" y="{{ dp.y2|add:-13 }}" width="66" height="26"
+                      fill="#150a00" stroke="#ff8800" stroke-width="1.5" rx="3"/>
+                <text x="{{ dp.x2|add:35 }}" y="{{ dp.y2|add:4 }}" text-anchor="middle"
+                      fill="#ff8800" font-size="8" font-family="'Outfit', sans-serif" font-weight="bold">DEPOT ST{{ dp.near_station }}</text>
+            </g>
+        {% endfor %}
+        <!-- ── CROSSOVERS (Turnouts) ── -->
+        {% for co in crossovers %}
+            <g id="crossover-{{ co.index }}">
+                <!-- Track overlays: wipes out main lines locally behind turnout switches -->
+                <rect x="{{ co.x_left }}" y="{{ up_y|add:-3 }}" width="{{ co.width }}" height="6" fill="#070714"/>
+                <rect x="{{ co.x_left }}" y="{{ down_y|add:-3 }}" width="{{ co.width }}" height="6" fill="#070714"/>
+                
+                <!-- Crossover Diagonal Line based on Turnout Type (No scissors) -->
+                {% if co.type == 'up_to_down' %}
+                    <line x1="{{ co.x_left }}" y1="{{ up_y }}" x2="{{ co.x_right }}" y2="{{ down_y }}" 
+                          stroke="#ff3344" stroke-width="3" stroke-linecap="round"/>
+                    <circle cx="{{ co.x_left }}" cy="{{ up_y }}" r="4.5" fill="#ff3344"/>
+                    <circle cx="{{ co.x_right }}" cy="{{ down_y }}" r="4.5" fill="#ff3344"/>
+                {% else %}
+                    <line x1="{{ co.x_left }}" y1="{{ down_y }}" x2="{{ co.x_right }}" y2="{{ up_y }}" 
+                          stroke="#ff3344" stroke-width="3" stroke-linecap="round"/>
+                    <circle cx="{{ co.x_left }}" cy="{{ down_y }}" r="4.5" fill="#ff3344"/>
+                    <circle cx="{{ co.x_right }}" cy="{{ up_y }}" r="4.5" fill="#ff3344"/>
+                {% endif %}
+                <!-- Small label box -->
+                <rect x="{{ co.mid_x|add:-22 }}" y="{{ co.mid_y|add:-9 }}" width="44" height="18"
+                      fill="#1a0508" stroke="#ff3344" stroke-width="1.2" rx="4"/>
+                <text x="{{ co.mid_x }}" y="{{ co.mid_y|add:3 }}" text-anchor="middle"
+                      fill="#ff3344" font-size="8.5" font-family="'Share Tech Mono', monospace" font-weight="bold">XOV-{{ co.index }}</text>
+                <!-- 3-Aspect Wayside Signals protecting Crossover Entry -->
+                {% if co.type == 'up_to_down' %}
+                    <g id="signal-co-group-{{ co.index }}">
+                        <line x1="{{ co.x_left|add:-15 }}" y1="{{ up_y|add:-15 }}" x2="{{ co.x_left|add:-15 }}" y2="{{ up_y|add:15 }}" stroke="#555" stroke-width="2"/>
+                        <rect x="{{ co.x_left|add:-20 }}" y="{{ up_y|add:-18 }}" width="10" height="26" fill="#111" stroke="#333" stroke-width="1" rx="2"/>
+                        <circle id="sig-co-{{ co.index }}-green" cx="{{ co.x_left|add:-15 }}" cy="{{ up_y|add:-13 }}" r="2.5" fill="#00ff66" filter="url(#glow)"/>
+                        <circle id="sig-co-{{ co.index }}-violet" cx="{{ co.x_left|add:-15 }}" cy="{{ up_y|add:-5 }}" r="2.5" fill="#330040"/>
+                        <circle id="sig-co-{{ co.index }}-red" cx="{{ co.x_left|add:-15 }}" cy="{{ up_y|add:3 }}" r="2.5" fill="#400000"/>
+                    </g>
+                {% else %}
+                    <g id="signal-co-group-{{ co.index }}">
+                        <line x1="{{ co.x_right|add:15 }}" y1="{{ down_y|add:-15 }}" x2="{{ co.x_right|add:15 }}" y2="{{ down_y|add:15 }}" stroke="#555" stroke-width="2"/>
+                        <rect x="{{ co.x_right|add:10 }}" y="{{ down_y|add:-18 }}" width="10" height="26" fill="#111" stroke="#333" stroke-width="1" rx="2"/>
+                        <circle id="sig-co-{{ co.index }}-green" cx="{{ co.x_right|add:15 }}" cy="{{ down_y|add:-13 }}" r="2.5" fill="#00ff66" filter="url(#glow)"/>
+                        <circle id="sig-co-{{ co.index }}-violet" cx="{{ co.x_right|add:15 }}" cy="{{ down_y|add:-5 }}" r="2.5" fill="#330040"/>
+                        <circle id="sig-co-{{ co.index }}-red" cx="{{ co.x_right|add:15 }}" cy="{{ down_y|add:3 }}" r="2.5" fill="#400000"/>
+                    </g>
+                {% endif %}
+            </g>
+        {% endfor %}
+        <!-- ── STATIONS ── -->
+        {% for s in stations %}
+            <g id="station-group-{{ s.number }}">
+                <!-- Station Title Header -->
+                <text x="{{ s.x }}" y="{{ s.box_up_y|add:-10 }}" text-anchor="middle"
+                      fill="#88ccff" font-size="11" font-family="'Outfit', sans-serif" font-weight="600" letter-spacing="0.5">{{ s.label }}</text>
+                <!-- Platform 01 (UP) -->
+                <rect x="{{ s.box_x }}" y="{{ s.box_up_y }}" width="{{ s.width }}" height="{{ s.height }}"
+                      fill="#00224d" stroke="#00ff88" stroke-width="2.5" rx="4" filter="url(#glow)"/>
+                <text x="{{ s.x }}" y="{{ s.up_y|add:1 }}" text-anchor="middle" dominant-baseline="middle"
+                      fill="white" font-size="9.5" font-family="'Outfit', sans-serif" font-weight="bold">PF-01</text>
+                <!-- Platform 02 (DOWN) -->
+                <rect x="{{ s.box_x }}" y="{{ s.box_down_y }}" width="{{ s.width }}" height="{{ s.height }}"
+                      fill="#00224d" stroke="#ffd700" stroke-width="2.5" rx="4" filter="url(#glow)"/>
+                <text x="{{ s.x }}" y="{{ s.down_y|add:1 }}" text-anchor="middle" dominant-baseline="middle"
+                      fill="white" font-size="9.5" font-family="'Outfit', sans-serif" font-weight="bold">PF-02</text>
+                <!-- Center Dashed Connector -->
+                <line x1="{{ s.x }}" y1="{{ s.box_up_y|add:24 }}" x2="{{ s.x }}" y2="{{ s.box_down_y }}"
+                      stroke="#4488ff" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.6"/>
+                <!-- 3-Aspect Platform Wayside Signals -->
+                <!-- UP Station Signal (Placed left of platform) -->
+                <g id="signal-up-group-{{ s.number }}">
+                    <line x1="{{ s.box_x|add:-15 }}" y1="{{ s.up_y|add:-15 }}" x2="{{ s.box_x|add:-15 }}" y2="{{ s.up_y|add:15 }}" stroke="#555" stroke-width="2"/>
+                    <rect x="{{ s.box_x|add:-20 }}" y="{{ s.up_y|add:-18 }}" width="10" height="26" fill="#111" stroke="#333" stroke-width="1" rx="2"/>
+                    <circle id="sig-up-{{ s.number }}-green" cx="{{ s.box_x|add:-15 }}" cy="{{ s.up_y|add:-13 }}" r="2.5" fill="#00ff66" filter="url(#glow)"/>
+                    <circle id="sig-up-{{ s.number }}-violet" cx="{{ s.box_x|add:-15 }}" cy="{{ s.up_y|add:-5 }}" r="2.5" fill="#330040"/>
+                    <circle id="sig-up-{{ s.number }}-red" cx="{{ s.box_x|add:-15 }}" cy="{{ s.up_y|add:3 }}" r="2.5" fill="#400000"/>
+                </g>
+                <!-- DOWN Station Signal (Placed right of platform) -->
+                <g id="signal-down-group-{{ s.number }}">
+                    <line x1="{{ s.box_x|add:75 }}" y1="{{ s.down_y|add:-15 }}" x2="{{ s.box_x|add:75 }}" y2="{{ s.down_y|add:15 }}" stroke="#555" stroke-width="2"/>
+                    <rect x="{{ s.box_x|add:70 }}" y="{{ s.down_y|add:-18 }}" width="10" height="26" fill="#111" stroke="#333" stroke-width="1" rx="2"/>
+                    <circle id="sig-down-{{ s.number }}-green" cx="{{ s.box_x|add:75 }}" cy="{{ s.down_y|add:-13 }}" r="2.5" fill="#00ff66" filter="url(#glow)"/>
+                    <circle id="sig-down-{{ s.number }}-violet" cx="{{ s.box_x|add:75 }}" cy="{{ s.down_y|add:-5 }}" r="2.5" fill="#330040"/>
+                    <circle id="sig-down-{{ s.number }}-red" cx="{{ s.box_x|add:75 }}" cy="{{ s.down_y|add:3 }}" r="2.5" fill="#400000"/>
+                </g>
+            </g>
+        {% endfor %}
+        <!-- ── THE TRAIN ITSELF ── -->
+        <g id="train-container">
+            <!-- Train Body with Outer Glow -->
+            <rect id="train" x="0" y="0" width="38" height="15" rx="4"
+                  fill="#ffd700" stroke="#000" stroke-width="1.5" filter="url(#glow)"/>
+            <!-- Train Window / Headlights -->
+            <rect id="train-glass" x="30" y="2" width="6" height="11" rx="1" fill="#111"/>
+            <!-- Train Label Text -->
+            <text id="train-label" x="0" y="0" text-anchor="middle" dominant-baseline="middle"
+                  font-size="8.5" font-family="'Share Tech Mono', monospace" font-weight="bold" fill="#000">TR-0011</text>
+        </g>
+    </svg>
+</div>
 <div class="legend">
-    <div class="leg"><div class="leg-line" style="background:#00ff88"></div> UP Line</div>
-    <div class="leg"><div class="leg-line" style="background:#ffd700"></div> DOWN Line</div>
-    <div class="leg"><div class="leg-box" style="background:#003580; border:2px solid #00ff88"></div> Platform</div>
-    <div class="leg"><div class="leg-line" style="background:#ff3333"></div> Crossover (XOV)</div>
-    <div class="leg"><div class="leg-line" style="background:#ff8800"></div> Depot</div>
-    <div class="leg"><div class="leg-box" style="background:#00ff00; border-radius:50%; width:10px; height:10px"></div> Platform / Track clear</div>
-    <div class="leg"><div class="leg-box" style="background:#ff0000; border-radius:50%; width:10px; height:10px"></div> Train occupying</div>
+    <div class="leg-title">Legend</div>
+    <div class="leg"><div class="leg-line" style="color:#00ff88; background:#00ff88"></div> UP Track</div>
+    <div class="leg"><div class="leg-line" style="color:#ffd700; background:#ffd700"></div> DOWN Track</div>
+    <div class="leg"><div class="leg-box" style="background:#00224d; border:2.5px solid #00ff88"></div> Platform</div>
+    <div class="leg"><div class="leg-line" style="color:#ff3344; background:#ff3344"></div> Crossover Track</div>
+    <div class="leg"><div class="leg-line" style="color:#ff8800; background:#ff8800"></div> Depot Siding</div>
+    <div class="leg"><div class="leg-dot" style="color:#00ff66; background:#00ff66"></div> Signal Clear (Green)</div>
+    <div class="leg"><div class="leg-dot" style="color:#df40ff; background:#df40ff"></div> Crossover Caution (Violet)</div>
+    <div class="leg"><div class="leg-dot" style="color:#ff3344; background:#ff3344"></div> Block Occupied (Red)</div>
 </div>
-
 <script>
-// ── Data passed from Django ────────────────────────────────────
-const stations = {{ stations_json|safe }};
-const upY   = {{ up_y }};
-const downY = {{ down_y }};
-const trackX1 = {{ track_x1 }};
-const trackX2 = {{ track_x2 }};
+// ── Core data passed from Django ────────────────────────────────────
+const stations   = {{ stations_json|safe }};
+const upY        = {{ up_y }};
+const downY      = {{ down_y }};
+const trackX1    = {{ track_x1 }};
+const trackX2    = {{ track_x2 }};
 const crossovers = {{ crossovers_json|safe }};
-
-const trainEl = document.getElementById('train');
-const trainLabel = document.getElementById('train-label');
-
-const lastCrossover = crossovers.length > 0 ? crossovers[crossovers.length - 1] : null;
-const firstCrossover = crossovers.length > 0 ? crossovers[0] : null;
-
-// ── Build the full path the train follows as a list of straight segments ──
-function buildPath() {
-    const path = [];
-
-    if (lastCrossover) {
-        path.push({x1: trackX1, y1: upY, x2: lastCrossover.up_left, y2: upY, track: 'up'});
-        path.push({x1: lastCrossover.up_left, y1: upY, x2: lastCrossover.dn_right, y2: downY, track: 'crossover'});
-        path.push({x1: lastCrossover.dn_right, y1: downY, x2: trackX2, y2: downY, track: 'down'});
-    } else {
-        path.push({x1: trackX1, y1: upY, x2: trackX2, y2: upY, track: 'up'});
-    }
-
-    if (firstCrossover) {
-        path.push({x1: trackX2, y1: downY, x2: firstCrossover.dn_right, y2: downY, track: 'down'});
-        path.push({x1: firstCrossover.dn_right, y1: downY, x2: firstCrossover.up_left, y2: upY, track: 'crossover'});
-        path.push({x1: firstCrossover.up_left, y1: upY, x2: trackX1, y2: upY, track: 'up'});
-    } else {
-        path.push({x1: trackX2, y1: downY, x2: trackX1, y2: downY, track: 'down'});
-    }
-
-    return path;
-}
-
-const journey = buildPath();
-let segIndex = 0;
-let segProgress = 0;
-const SPEED = 0.006;
+const networkData = {{ network_json|safe }};
+// State variables for frontend render loop
 let running = true;
-
-// ── Draw track segments as individually colorable lines ──────────
+let prevX = null;
+// Populate static track blocks inside the SVG
 function drawTrackSegments() {
     const upGroup = document.getElementById('up-track-segments');
     const downGroup = document.getElementById('down-track-segments');
     upGroup.innerHTML = '';
     downGroup.innerHTML = '';
-
     const sorted = [...stations].sort((a, b) => a.x - b.x);
+    // Lead segments
+    createTrackLine(upGroup, 'block-up-lead', trackX1, sorted[0].x, upY, '#00ff88');
+    createTrackLine(downGroup, 'block-down-lead', trackX1, sorted[0].x, downY, '#ffd700');
+    // Station to Station blocks
     for (let i = 0; i < sorted.length - 1; i++) {
-        const x1 = sorted[i].x + sorted[i].width / 2;
-        const x2 = sorted[i + 1].x - sorted[i + 1].width / 2;
-
-        const upLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        upLine.setAttribute('x1', x1); upLine.setAttribute('y1', upY);
-        upLine.setAttribute('x2', x2); upLine.setAttribute('y2', upY);
-        upLine.setAttribute('stroke', '#00ff88'); upLine.setAttribute('stroke-width', '4');
-        upLine.setAttribute('id', 'block-up-' + i);
-        upGroup.appendChild(upLine);
-
-        const downLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        downLine.setAttribute('x1', x1); downLine.setAttribute('y1', downY);
-        downLine.setAttribute('x2', x2); downLine.setAttribute('y2', downY);
-        downLine.setAttribute('stroke', '#ffd700'); downLine.setAttribute('stroke-width', '4');
-        downLine.setAttribute('id', 'block-down-' + i);
-        downGroup.appendChild(downLine);
+        createTrackLine(upGroup, 'block-up-' + i, sorted[i].x, sorted[i+1].x, upY, '#00ff88');
+        createTrackLine(downGroup, 'block-down-' + i, sorted[i].x, sorted[i+1].x, downY, '#ffd700');
     }
-
-    const leadUp = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    leadUp.setAttribute('x1', trackX1); leadUp.setAttribute('y1', upY);
-    leadUp.setAttribute('x2', sorted[0].x - sorted[0].width / 2); leadUp.setAttribute('y2', upY);
-    leadUp.setAttribute('stroke', '#00ff88'); leadUp.setAttribute('stroke-width', '4');
-    leadUp.setAttribute('id', 'block-up-lead');
-    upGroup.appendChild(leadUp);
-
-    const trailDown = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    const lastS = sorted[sorted.length - 1];
-    trailDown.setAttribute('x1', lastS.x + lastS.width / 2); trailDown.setAttribute('y1', downY);
-    trailDown.setAttribute('x2', trackX2); trailDown.setAttribute('y2', downY);
-    trailDown.setAttribute('stroke', '#ffd700'); trailDown.setAttribute('stroke-width', '4');
-    trailDown.setAttribute('id', 'block-down-trail');
-    downGroup.appendChild(trailDown);
+    // Trail segments
+    createTrackLine(upGroup, 'block-up-trail', sorted[sorted.length - 1].x, trackX2, upY, '#00ff88');
+    createTrackLine(downGroup, 'block-down-trail', sorted[sorted.length - 1].x, trackX2, downY, '#ffd700');
 }
-
-function resetAllBlocksAndSignals() {
+function createTrackLine(group, id, x1, x2, y, defaultColor) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y);
+    line.setAttribute('stroke', defaultColor);
+    line.setAttribute('stroke-width', '4');
+    line.setAttribute('id', id);
+    group.appendChild(line);
+}
+// Reset block visual highlights
+function resetAllBlocks() {
     document.querySelectorAll('[id^="block-up-"]').forEach(el => el.setAttribute('stroke', '#00ff88'));
     document.querySelectorAll('[id^="block-down-"]').forEach(el => el.setAttribute('stroke', '#ffd700'));
-    stations.forEach(s => {
-        const up = document.getElementById('signal-up-' + s.number);
-        const down = document.getElementById('signal-down-' + s.number);
-        if (up) up.setAttribute('fill', '#00ff00');
-        if (down) down.setAttribute('fill', '#00ff00');
+}
+// Update Wayside Signal colors on the SVG
+function renderSignalAspect(sigData) {
+    // Determine DOM element IDs
+    let greenId, violetId, redId;
+    if (sigData.signal_type === 'station') {
+        const stationNum = sigData.signal_id.split('-')[2];
+        const line = sigData.line;
+        greenId = `sig-${line}-${stationNum}-green`;
+        violetId = `sig-${line}-${stationNum}-violet`;
+        redId = `sig-${line}-${stationNum}-red`;
+    } else {
+        const coIndex = sigData.signal_id.split('-')[2];
+        greenId = `sig-co-${coIndex}-green`;
+        violetId = `sig-co-${coIndex}-violet`;
+        redId = `sig-co-${coIndex}-red`;
+    }
+    const greenEl = document.getElementById(greenId);
+    const violetEl = document.getElementById(violetId);
+    const redEl = document.getElementById(redId);
+    if (!greenEl || !violetEl || !redEl) return;
+    // Reset colors to dark state
+    greenEl.setAttribute('fill', '#002208');
+    violetEl.setAttribute('fill', '#200030');
+    redEl.setAttribute('fill', '#330000');
+    // Illuminate the active aspect
+    if (sigData.aspect === 'GREEN') {
+        greenEl.setAttribute('fill', '#00ff66');
+    } else if (sigData.aspect === 'VIOLET') {
+        violetEl.setAttribute('fill', '#df40ff');
+    } else if (sigData.aspect === 'RED') {
+        redEl.setAttribute('fill', '#ff3344');
+    }
+}
+// Update track circuit highlights on the SVG
+function renderTrackOccupancies(trackCircuits) {
+    resetAllBlocks();
+    const color = '#ff3344'; // OCC Occupied Red glow
+    trackCircuits.forEach(tc => {
+        if (tc.is_occupied) {
+            if (tc.tc_id === 'TC-UP-LEAD') {
+                document.getElementById('block-up-lead')?.setAttribute('stroke', color);
+            } else if (tc.tc_id === 'TC-UP-TRAIL') {
+                document.getElementById('block-up-trail')?.setAttribute('stroke', color);
+            } else if (tc.tc_id === 'TC-DN-LEAD') {
+                document.getElementById('block-down-lead')?.setAttribute('stroke', color);
+            } else if (tc.tc_id === 'TC-DN-TRAIL') {
+                document.getElementById('block-down-trail')?.setAttribute('stroke', color);
+            } else if (tc.tc_id.startsWith('TC-UP-')) {
+                const idx = parseInt(tc.tc_id.split('-')[2]) - 1;
+                document.getElementById('block-up-' + idx)?.setAttribute('stroke', color);
+            } else if (tc.tc_id.startsWith('TC-DN-')) {
+                const idx = parseInt(tc.tc_id.split('-')[2]) - 1;
+                document.getElementById('block-down-' + idx)?.setAttribute('stroke', color);
+            }
+        }
     });
 }
-
-function updateOccupancy(x, y, track) {
-    resetAllBlocksAndSignals();
-    if (track === 'crossover') return;
-
-    const sorted = [...stations].sort((a, b) => a.x - b.x);
-    const prefix = track === 'up' ? 'block-up-' : 'block-down-';
-    const color = '#ff0000';
-
-    if (track === 'up' && x < sorted[0].x) {
-        const el = document.getElementById('block-up-lead');
-        if (el) el.setAttribute('stroke', color);
-    }
-    if (track === 'down' && x > sorted[sorted.length - 1].x) {
-        const el = document.getElementById('block-down-trail');
-        if (el) el.setAttribute('stroke', color);
-    }
-
-    for (let i = 0; i < sorted.length - 1; i++) {
-        if (x >= sorted[i].x && x <= sorted[i + 1].x) {
-            const el = document.getElementById(prefix + i);
-            if (el) el.setAttribute('stroke', color);
-        }
-    }
-
-    stations.forEach(s => {
-        if (Math.abs(s.x - x) < 30) {
-            const sigId = track === 'up' ? 'signal-up-' + s.number : 'signal-down-' + s.number;
-            const el = document.getElementById(sigId);
-            if (el) el.setAttribute('fill', '#ff0000');
-        }
-    });
-}
-
-function moveTrain() {
+// Main ajax polling loop
+function fetchSimulationTick() {
     if (!running) return;
-
-    segProgress += SPEED;
-    if (segProgress >= 1) {
-        segProgress = 0;
-        segIndex = (segIndex + 1) % journey.length;
-
-        const seg = journey[segIndex];
-        if (seg.track === 'up') {
-            document.getElementById('train-status').innerText = 'Running on UP line';
-        } else if (seg.track === 'down') {
-            document.getElementById('train-status').innerText = 'Running on DOWN line';
+    fetch('/simulation/tick/')
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP error ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            updateOCCDashboard(data);
+            // Fetch next frame in 30ms for 30 FPS updates
+            setTimeout(fetchSimulationTick, 30);
+        })
+        .catch(err => {
+            console.error('Error fetching simulation tick:', err);
+            // Retry after 1 second if server returns error
+            setTimeout(fetchSimulationTick, 1000);
+        });
+}
+// Renders train coordinate, telemetry values, and wayside elements
+function updateOCCDashboard(data) {
+    const t = data.train;
+    // 1. Move train box on the track
+    const trainCont = document.getElementById('train-container');
+    trainCont.setAttribute('transform', `translate(${t.x - 19}, ${t.y - 7.5})`);
+    // 2. Adjust headlights depending on travel heading
+    const trainGlassEl = document.getElementById('train-glass');
+    const trainLabelEl = document.getElementById('train-label');
+    if (prevX !== null) {
+        const movingLeft = (t.x < prevX);
+        if (movingLeft) {
+            trainGlassEl.setAttribute('x', '2');
+            trainLabelEl.setAttribute('x', '22');
+            trainLabelEl.setAttribute('y', '8');
         } else {
-            document.getElementById('train-status').innerText = 'Crossing over...';
+            trainGlassEl.setAttribute('x', '30');
+            trainLabelEl.setAttribute('x', '16');
+            trainLabelEl.setAttribute('y', '8');
         }
     }
-
-    const seg = journey[segIndex];
-    const x = seg.x1 + (seg.x2 - seg.x1) * segProgress;
-    const y = seg.y1 + (seg.y2 - seg.y1) * segProgress;
-
-    trainEl.setAttribute('x', x - 17);
-    trainEl.setAttribute('y', y - 7);
-    trainLabel.setAttribute('x', x);
-    trainLabel.setAttribute('y', y);
-    trainEl.setAttribute('fill', seg.track === 'down' ? '#ffd700' : (seg.track === 'crossover' ? '#ff66ff' : '#00ff88'));
-
-    updateOccupancy(x, y, seg.track);
+    prevX = t.x;
+    // 3. Update active block telemetry UI
+    const activeSeg = t.journey ? t.journey[t.seg_index] : null;
+    const opStatusText = document.getElementById('op-status');
+    const blockHud = document.getElementById('hud-block');
+    const trainRect = document.getElementById('train');
+    if (t.y === upY) {
+        trainRect.setAttribute('fill', '#00ff88');
+        opStatusText.innerText = 'OPERATIONS ACTIVE / UP LINE';
+        blockHud.innerText = 'UP LINE';
+        blockHud.className = 'hud-value text-green';
+    } else if (t.y === downY) {
+        trainRect.setAttribute('fill', '#ffd700');
+        opStatusText.innerText = 'OPERATIONS ACTIVE / DOWN LINE';
+        blockHud.innerText = 'DOWN LINE';
+        blockHud.className = 'hud-value text-yellow';
+    } else {
+        trainRect.setAttribute('fill', '#df40ff');
+        opStatusText.innerText = 'OPERATIONS ACTIVE / CROSSING OVER';
+        blockHud.innerText = 'CROSSOVER';
+        blockHud.className = 'hud-value text-violet';
+    }
+    // 4. Update HUD widgets
+    document.getElementById('hud-speed').innerText = (t.speed * 3.6).toFixed(1);
+    document.getElementById('hud-acc').innerText = (t.acc >= 0 ? '+' : '') + t.acc.toFixed(2);
+    document.getElementById('hud-acc').className = t.acc > 0 ? "hud-value text-green" : 
+                                                    t.acc < 0 ? "hud-value text-red" : "hud-value";
+    
+    document.getElementById('hud-dwell').innerText = t.state === 'DWELLING' ? Math.ceil(t.dwell_timer) : '-';
+    // 5. Update wayside elements (Signals & Track Circuits)
+    renderTrackOccupancies(data.track_circuits);
+    data.signals.forEach(sig => renderSignalAspect(sig));
+    // 6. Update HUD Signal display aspect
+    // Find the next signal ahead of the train
+    let signalAhead = null;
+    if (t.y === upY) {
+        signalAhead = data.signals.filter(s => s.line === 'up' && s.x > t.x).sort((a,b) => a.x - b.x)[0];
+    } else if (t.y === downY) {
+        signalAhead = data.signals.filter(s => s.line === 'down' && s.x < t.x).sort((a,b) => b.x - a.x)[0];
+    }
+    if (signalAhead) {
+        const aspect = signalAhead.aspect;
+        document.getElementById('hud-signal').innerText = aspect;
+        document.getElementById('hud-signal').className = aspect === 'RED' ? 'hud-value text-red' : 
+                                                           aspect === 'VIOLET' ? 'hud-value text-violet' : 'hud-value text-green';
+    } else {
+        document.getElementById('hud-signal').innerText = 'GREEN';
+        document.getElementById('hud-signal').className = 'hud-value text-green';
+    }
 }
-
 function toggleSim() {
     running = !running;
+    const btn = document.getElementById('btn-pause');
+    const opStatusText = document.getElementById('op-status');
+    if (running) {
+        btn.innerText = 'Pause Operations';
+        btn.classList.add('btn-primary');
+        opStatusText.innerText = 'OPERATIONS ACTIVE / RUNNING';
+        // Restart polling loop
+        fetchSimulationTick();
+    } else {
+        btn.innerText = 'Resume Operations';
+        btn.classList.remove('btn-primary');
+        opStatusText.innerText = 'OPERATIONS PAUSED';
+    }
 }
+// Initial draw sequence
+drawTrackSegments();
+resetAllBlocks();
+// Kick off polling requests
+fetchSimulationTick();
+</script>
+</body>
+</html>
+
